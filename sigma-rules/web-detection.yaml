@@ -1,0 +1,20 @@
+title: Web Detection
+id: 32459002-dsf3-4a5b-9cde-1234567890ab
+status: experimental
+description: Detects web-based attacks and anomalies in web server logs
+author: Abdur-Rahman Dalhatu Hamza
+logsource:
+    product: linux
+    service: webserver
+detection:
+    selection:
+      message|contains:
+        - '/wp-login.php'
+        - '/admin'
+        - '/.env'
+        - '/phpmyadmin'
+    condition: selection
+level: medium
+tags:
+  - attack.recon
+  - attack.t1595.003

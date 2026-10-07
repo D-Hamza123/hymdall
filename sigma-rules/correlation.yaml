@@ -1,0 +1,20 @@
+title: Attack detection via web and ssh logs
+id: 9f8e7d6c-5b4a-3c2b-1a0f-9e8d7c6b5a4f
+status: experimental
+description: Detects potential attacks by correlating
+  SSH brute force attempts and web-based reconnaissance from the same source IP.
+author: Abdur-Rahman Dalhatu Hamza
+correlation:
+  type: temporal
+  rules:
+    - 12345678-90ab-cdef-1234-567890abcdef
+    - 32459002-dsf3-4a5b-9cde-1234567890ab
+  group-by:
+    - src_ip
+  timespan: 5m
+level: high
+tags:
+    - attack.credential_access
+    - attack.t1110
+    - attack.recon
+    - attack.t1595.003

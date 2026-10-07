@@ -1,0 +1,17 @@
+title: SSH Brute Force Detection
+id: 12345678-90ab-cdef-1234-567890abcdef
+status: experimental
+description: Catches 5 or more failed ssh password attempts within 60 seconds
+author: Abdur-Rahman Dalhatu Hamza
+logsource:
+    product: linux
+    service: sshd
+detection:
+    selection:
+      message|contains: 'Failed password'
+    timeframe: 60s
+    condition: selection | count() by src_ip >= 5
+level: medium
+tags:
+  - attack.credential_access
+  - attack.t1110
