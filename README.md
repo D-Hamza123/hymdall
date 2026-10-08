@@ -11,8 +11,10 @@ hymdall is a utility designed to analyze and process log files to identify speci
 - **Customizable**: Easily extendable to include additional patterns, Sigma rules, or analysis techniques.
 
 ## File Structure
+- `LICENSE`: Contains the MIT License for the project.
+- `README.md`: Documentation for the project.
 - `hymdall.py`: The main script for processing log files.
-- `sample-logs/`: Directory containing sample log files for testing.
+- `sample-logs/`: Directory containing sample log files.
   - `auth logs/`: Contains authentication log samples.
     - `auth-1.log`
     - `auth-2.log`
@@ -22,6 +24,7 @@ hymdall is a utility designed to analyze and process log files to identify speci
 - `sigma-rules/`: Directory containing Sigma rules for threat detection.
   - `correlation.yaml`: Sigma rule for correlating multiple events.
   - `ssh-brute-force.yaml`: Sigma rule for detecting SSH brute force attacks.
+  - `ssh-brute-force-correlation.yaml`: Sigma rule for correlating SSH brute force attacks.
   - `web-detection.yaml`: Sigma rule for detecting suspicious web activity.
 
 ## Usage

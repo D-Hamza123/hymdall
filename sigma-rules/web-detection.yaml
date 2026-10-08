@@ -1,5 +1,5 @@
 title: Web Detection
-id: 32459002-dsf3-4a5b-9cde-1234567890ab
+id: 37AABD81-3891-401D-A851-595BA54D7AF2
 status: experimental
 description: Detects web-based attacks and anomalies in web server logs
 author: Abdur-Rahman Dalhatu Hamza
@@ -16,5 +16,4 @@ detection:
     condition: selection
 level: medium
 tags:
-  - attack.recon
   - attack.t1595.003

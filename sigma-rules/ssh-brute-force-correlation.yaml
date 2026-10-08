@@ -1,0 +1,16 @@
+title: SSH Brute Force Correlation/Count
+id: 9f8e7d6c-5b4a-3c2b-1a0f-9e8d7c6b5a4f
+status: experimental
+description: Alerts when the same source IP fails SSH login 5 or more times within 60 seconds
+correlation:
+  type: temporal
+  rules:
+    - 3ca8b172-e1d5-4cb3-af05-b778737ad941
+  group-by:
+    - src_ip
+  timespan: 60s
+  condition:
+    gte: 5
+level: medium
+tags:
+  - attack.t1110
