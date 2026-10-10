@@ -11,7 +11,7 @@ correlation:
     - 32459002-dsf3-4a5b-9cde-1234567890ab
   group-by:
     - src_ip
-  timespan: 5m
+  timespan: 7m
 level: high
 tags:
     - attack.credential_access
