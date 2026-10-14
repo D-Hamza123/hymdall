@@ -10,18 +10,21 @@ import argparse
 WINDOW = timedelta(seconds=60)
 THRESHOLD = 5
 
+TIME_FORMATS = [
+    "%b %d %H:%M:%S", # e.g., "Jan 12 15:04:05"
+    "%Y-%m-%dT%H:%M:%S.%f%z", # e.g., "2023-01-12T15:04:05.123456+0000"
+    "%d/%b/%Y:%H:%M:%S %z", # e.g., "12/Jan/2023:15:04:05 +0000"
+]
+
 parser = argparse.ArgumentParser(description="Detect SSH brute force attacks from auth-logs and web-logs.")
 parser.add_argument("--auth", required=True, help="Path to the auth log file")
 parser.add_argument("--web", help="Path to the web log file (optional)")
 args = parser.parse_args()
 
-# print(args.auth)
-# print(args.web)
-
 cache = {}
 
-pattern = re.compile(
-    r"^(\w{3}\s+\d+\s[\d:]{8}) .* Failed password .* from (\d+\.\d+\.\d+\.\d+)"
+ssh_pattern = re.compile(
+    r"Failed password .* from (\d+\.\d+\.\d+\.\d+)"
 )
 web_pattern = re.compile(
     r'^(\d+\.\d+\.\d+\.\d+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
@@ -31,6 +34,28 @@ web_hits = defaultdict(list)
 recent = defaultdict(deque)
 alerted = set()
 attackers = set()
+
+def parse_timestamp(timestamp):
+    try:
+        return datetime.fromisoformat(timestamp)
+    except ValueError:
+        pass
+    for fmt in TIME_FORMATS:
+        try:
+            dt = datetime.strptime(timestamp, fmt)
+        except ValueError:
+            continue
+        if dt.year == 1900:
+            dt = dt.replace(year=datetime.now().year)
+        return dt
+    return None
+
+def get_time(line):
+    parts = line.split()
+    when = parse_timestamp(parts[0]) if parts else None
+    if when is None:
+        when = parse_timestamp(" ".join(parts[:3]))
+    return when
 
 def lookup_ip(ip):
     if ip in cache:
@@ -50,19 +75,21 @@ def lookup_ip(ip):
     cache[ip] = result
     return result
 
-def parse_web_time(text):
-    return datetime.strptime(text, "%d/%b/%Y:%H:%M:%S %z")
+#def parse_web_time(text):
+    #return datetime.strptime(text, "%d/%b/%Y:%H:%M:%S %z")
 
-def parse_time(text):
-    return datetime.strptime("2026 " + text,"%Y %b %d %H:%M:%S")
+#def parse_time(text):
+    #return datetime.strptime("2026 " + text,"%Y %b %d %H:%M:%S")
 
 try:
     with open(args.auth) as f:
         for line in f:
-            match = pattern.search(line)
+            match = ssh_pattern.search(line)
             if match:
-                when = parse_time(match.group(1))
-                ip = match.group(2)
+                when = get_time(line)
+                if when is None:
+                    continue
+                ip = match.group(1)
                 recent[ip].append(when)
                 cutoff = when - WINDOW
 
@@ -83,7 +110,7 @@ try:
                 web_match = web_pattern.search(line)
                 if web_match:
                     web_ip = web_match.group(1)
-                    web_when = parse_web_time(web_match.group(2))
+                    web_when = parse_timestamp(web_match.group(2))
                     web_path = web_match.group(4)
 
                     if web_path in suspicious_paths:
