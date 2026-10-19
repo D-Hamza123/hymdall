@@ -22,6 +22,7 @@ hymdall operates by scanning log files for predefined patterns, anomalies, or su
 ## File Structure
 - `LICENSE`: Contains the MIT License for the project.
 - `README.md`: Documentation for the project.
+- `pyproject.toml`: Project configuration and packaging metadata (defines the `hymdall` console script entry point).
 - `hymdall.py`: The main script for processing log files.
 - `sample-logs/`: Directory containing sample log files.
   - `auth logs/`: Contains authentication log samples.
@@ -35,6 +36,65 @@ hymdall operates by scanning log files for predefined patterns, anomalies, or su
   - `ssh-brute-force.yaml`: Sigma rule for detecting SSH brute force attacks.
   - `ssh-brute-force-correlation.yaml`: Sigma rule for correlating SSH brute force attacks.
   - `web-detection.yaml`: Sigma rule for detecting suspicious web activity.
+
+## Installation
+
+hymdall is not published on PyPI. Install it directly from the repository with pipx, which keeps the tool in an isolated environment and makes the `hymdall` command available on your PATH without touching your system Python.
+
+### Step 1: Install pipx
+
+| Operating System | Command |
+|---|---|
+| macOS | `brew install pipx` |
+| Linux (Debian / Ubuntu) | `sudo apt update && sudo apt install pipx` |
+| Linux (Fedora) | `sudo dnf install pipx` |
+| Linux (Arch) | `sudo pacman -S pipx` |
+| Windows | `winget install pipx.Pipx` (or `pip install pipx`) |
+
+Then, on every operating system:
+
+```bash
+pipx ensurepath
+```
+
+**Restart your terminal** after running `pipx ensurepath` so the PATH changes take effect.
+
+### Step 2: Install hymdall from the repository
+
+```bash
+pipx install https://github.com/D-Hamza123/hymdall.git
+```
+
+Run `pipx ensurepath` again and restart your terminal once more. You can then run the tool from anywhere:
+
+```bash
+hymdall --auth /path/to/auth.log --web /path/to/web.log
+```
+
+To pick up future updates without re-cloning:
+
+```bash
+pipx upgrade hymdall
+```
+
+### Alternative: Clone and run manually
+
+If you prefer not to install pipx (for example, if you want to edit the source or run the tool from a virtual environment), clone the repository and run the script directly:
+
+```bash
+git clone https://github.com/D-Hamza123/hymdall.git
+cd hymdall
+python3 hymdall.py --auth /path/to/auth.log --web /path/to/web.log
+```
+
+With this approach you will need to `git pull` (or re-clone) to receive updates.
+
+### Which option should I use?
+
+| Option | Best for | What it does |
+|---|---|---|
+| **pipx install (recommended)** | Using the tool as a CLI | Installs hymdall into its own isolated environment, exposes the `hymdall` command on your PATH automatically, and lets you upgrade with `pipx upgrade hymdall` without re-cloning the repo. |
+| **Clone and run manually** | Editing / contributing | Gives you direct access to the source code so you can modify `hymdall.py`. You are responsible for keeping your local copy up to date with `git pull`. |
 
 ## Usage
 
