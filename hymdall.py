@@ -16,24 +16,7 @@ TIME_FORMATS = [
     "%d/%b/%Y:%H:%M:%S %z", # e.g., "12/Jan/2023:15:04:05 +0000"
 ]
 
-parser = argparse.ArgumentParser(description="Detect SSH brute force attacks from auth-logs and web-logs.")
-parser.add_argument("--auth", required=True, help="Path to the auth log file")
-parser.add_argument("--web", help="Path to the web log file (optional)")
-args = parser.parse_args()
-
 cache = {}
-
-ssh_pattern = re.compile(
-    r"Failed password .* from (\d+\.\d+\.\d+\.\d+)"
-)
-web_pattern = re.compile(
-    r'^(\d+\.\d+\.\d+\.\d+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
-)
-suspicious_paths = {"/wp-login.php", "/admin", "/.env", "/phpmyadmin"}
-web_hits = defaultdict(list)
-recent = defaultdict(deque)
-alerted = set()
-attackers = set()
 
 def parse_timestamp(timestamp):
     try:
@@ -75,57 +58,69 @@ def lookup_ip(ip):
     cache[ip] = result
     return result
 
-#def parse_web_time(text):
-    #return datetime.strptime(text, "%d/%b/%Y:%H:%M:%S %z")
-
-#def parse_time(text):
-    #return datetime.strptime("2026 " + text,"%Y %b %d %H:%M:%S")
-
-try:
-    with open(args.auth) as f:
-        for line in f:
-            match = ssh_pattern.search(line)
-            if match:
-                when = get_time(line)
-                if when is None:
-                    continue
-                ip = match.group(1)
-                recent[ip].append(when)
-                cutoff = when - WINDOW
-
-                while recent[ip][0] < cutoff:
-                    recent[ip].popleft()
-                if len(recent[ip]) >= THRESHOLD:
-                    if ip not in alerted:
-                        info = lookup_ip(ip)
-                        alerted.add(ip)
-                        attackers.add(ip)
-                        print(f"[SSH] {ip} ({info.get('country', '?')}, {info.get('city', '?')}) {len(recent[ip])}"
-                              f" failed attempts within {int(WINDOW.total_seconds())}s at {when}")
-                else:
-                    alerted.discard(ip)
-    if args.web:
-        with open(args.web) as f:
+def main():
+    ssh_pattern = re.compile(
+        r"Failed password .* from (\d+\.\d+\.\d+\.\d+)"
+    )
+    web_pattern = re.compile(
+        r'^(\d+\.\d+\.\d+\.\d+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
+    )
+    suspicious_paths = {"/wp-login.php", "/admin", "/.env", "/phpmyadmin"}
+    web_hits = defaultdict(list)
+    recent = defaultdict(deque)
+    alerted = set()
+    attackers = set()
+    parser = argparse.ArgumentParser(description="Detect SSH brute force attacks from auth-logs and web-logs.")
+    parser.add_argument("--auth", required=True, help="Path to the auth log file")
+    parser.add_argument("--web", help="Path to the web log file (optional)")
+    args = parser.parse_args()
+    try:
+        with open(args.auth) as f:
             for line in f:
-                web_match = web_pattern.search(line)
-                if web_match:
-                    web_ip = web_match.group(1)
-                    web_when = parse_timestamp(web_match.group(2))
-                    web_path = web_match.group(4)
+                match = ssh_pattern.search(line)
+                if match:
+                    when = get_time(line)
+                    if when is None:
+                        continue
+                    ip = match.group(1)
+                    recent[ip].append(when)
+                    cutoff = when - WINDOW
 
-                    if web_path in suspicious_paths:
-                        if web_path not in web_hits[web_ip]:
-                            web_hits[web_ip].append(web_path)
-                            print(f"[WEB] {web_ip} accessed {web_path} at {web_when}")
+                    while recent[ip][0] < cutoff:
+                        recent[ip].popleft()
+                    if len(recent[ip]) >= THRESHOLD:
+                        if ip not in alerted:
+                            info = lookup_ip(ip)
+                            alerted.add(ip)
+                            attackers.add(ip)
+                            print(f"[SSH] {ip} ({info.get('country', '?')}, {info.get('city', '?')}) {len(recent[ip])}"
+                                f" failed attempts within {int(WINDOW.total_seconds())}s at {when}")
+                    else:
+                        alerted.discard(ip)
+        if args.web:
+            with open(args.web) as f:
+                for line in f:
+                    web_match = web_pattern.search(line)
+                    if web_match:
+                        web_ip = web_match.group(1)
+                        web_when = parse_timestamp(web_match.group(2))
+                        web_path = web_match.group(4)
 
-except FileNotFoundError as e:
-    print(f"File not found: {e}")
-    sys.exit(1)
-except PermissionError as e:
-    print(f"Permission denied: {e}. Try running with `sudo`, or copy the log files to a readable location.")
-    sys.exit(1)
+                        if web_path in suspicious_paths:
+                            if web_path not in web_hits[web_ip]:
+                                web_hits[web_ip].append(web_path)
+                                print(f"[WEB] {web_ip} accessed {web_path} at {web_when}")
 
-for ip in attackers & web_hits.keys():
-    print(f"[CORRELATED] {ip} ({lookup_ip(ip).get('country', '?')}, {lookup_ip(ip).get('city', '?')}): "
-              f"SSH brute force + web paths {web_hits[ip]}")
+    except FileNotFoundError as e:
+        print(f"File not found: {e}")
+        sys.exit(1)
+    except PermissionError as e:
+        print(f"Permission denied: {e}. Try running with `sudo`, or copy the log files to a readable location.")
+        sys.exit(1)
 
+    for ip in attackers & web_hits.keys():
+        print(f"[CORRELATED] {ip} ({lookup_ip(ip).get('country', '?')}, {lookup_ip(ip).get('city', '?')}): "
+                f"SSH brute force + web paths {web_hits[ip]}")
+
+if __name__ == "__main__":
+    main()
