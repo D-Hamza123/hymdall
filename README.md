@@ -127,9 +127,6 @@ python3 hymdall.py [options]
 #### Available Arguments
 - `--auth-logs <path>`: Specify the path to the directory containing authentication logs. Default is `sample-logs/auth logs/`.
 - `--web-logs <path>`: Specify the path to the directory containing web logs. Default is `sample-logs/web logs/`.
-- `--sigma-rules <path>`: Specify the path to the directory containing Sigma rules. Default is `sigma-rules/`.
-- `--output <path>`: Specify the path to save the analysis report. If not provided, results are displayed in the terminal.
-- `--verbose`: Enable verbose mode for detailed logging during execution.
 
 #### Example Commands
 1. Analyze logs using default directories:
