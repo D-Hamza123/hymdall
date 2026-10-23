@@ -62,7 +62,7 @@ pipx ensurepath
 ### Step 2: Install hymdall from the repository
 
 ```bash
-pipx install https://github.com/D-Hamza123/hymdall.git
+pipx install git+https://github.com/D-Hamza123/hymdall.git
 ```
 
 Run `pipx ensurepath` again and restart your terminal once more. You can then run the tool from anywhere:
