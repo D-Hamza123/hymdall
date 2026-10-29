@@ -71,6 +71,7 @@ def main():
     ssh_pattern = re.compile(
         r"Failed password .* from (\d+\.\d+\.\d+\.\d+)"
     )
+    repeat_pattern = re.compile(r"message repeated (?P<count>\d+) times")
     web_pattern = re.compile(
         r'^(\d+\.\d+\.\d+\.\d+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
     )
@@ -100,13 +101,16 @@ def main():
                 auth_lines_read += 1
                 match = ssh_pattern.search(line)
                 if match:
-                    auth_failed_logins += 1
+                    rep = repeat_pattern.search(line)
+                    count = int(rep.group("count")) if rep else 1
+                    auth_failed_logins += count
                     when = get_time(line)
                     if when is None:
                         auth_skipped_lines += 1
                         continue
                     ip = match.group(1)
-                    recent[ip].append(when)
+                    for _ in range(count):
+                        recent[ip].append(when)
                     cutoff = when - WINDOW
 
                     while recent[ip][0] < cutoff:
