@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta
 import argparse
 import os
+import ipaddress
 
 WINDOW = timedelta(seconds=60)
 THRESHOLD = 5
@@ -67,13 +68,36 @@ def lookup_ip(ip):
     cache[ip] = result
     return result
 
+def matches_selection(selection, event):
+    for key, expected in selection.items():
+        field, _, modifier = key.partition("|")
+        value = str(event.get(field, "")).lower()
+        expected_values = expected if isinstance(expected, list) else [expected]
+        expected_values = [str(e).lower() for e in expected_values]
+        if modifier == "contains":
+            matched = any(e in value for e in expected_values)
+        elif modifier == "":
+            matched = any(e == value for e in expected_values)
+        else:
+            raise ValueError(f"Unknown modifier: {modifier!r} in rule key {key!r}")
+        if not matched:
+            return False
+    return True
+
+def is_valid_ip(ip):
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
 def main():
     ssh_pattern = re.compile(
-        r"Failed password .* from (\d+\.\d+\.\d+\.\d+)"
+        r"Failed password .* from (?P<ip>[0-9a-fA-F:.]+)"
     )
     repeat_pattern = re.compile(r"message repeated (?P<count>\d+) times")
     web_pattern = re.compile(
-        r'^(\d+\.\d+\.\d+\.\d+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
+        r'^(?P<ip>[0-9a-fA-F:.]+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)'
     )
     suspicious_paths = {"/wp-login.php", "/admin", "/.env", "/phpmyadmin"}
     web_hits = defaultdict(list)
@@ -83,6 +107,7 @@ def main():
     parser = argparse.ArgumentParser(description="Detect SSH brute force attacks from auth-logs and web-logs.")
     parser.add_argument("--auth", required=True, help="Path to the auth log file")
     parser.add_argument("--web", help="Path to the web log file (optional)")
+    parser.add_argument("--rules", help="Path to a Sigma rule file (optional)")
     args = parser.parse_args()
 
     auth_lines_read = 0
@@ -95,20 +120,31 @@ def main():
     web_matched = 0
     web_skipped_lines = 0
 
+    rule_matches = 0
+    regex_line_matches = 0
+
+    sel = {"message|contains": "Failed password"}
+
     try:
         with open(args.auth) as f:
             for line in f:
+                if matches_selection(sel, {"message": line}):
+                    rule_matches += 1
                 auth_lines_read += 1
                 match = ssh_pattern.search(line)
                 if match:
+                    regex_line_matches += 1
                     rep = repeat_pattern.search(line)
                     count = int(rep.group("count")) if rep else 1
                     auth_failed_logins += count
                     when = get_time(line)
                     if when is None:
-                        auth_skipped_lines += 1
+                        auth_skipped_lines += count
                         continue
-                    ip = match.group(1)
+                    ip = match.group("ip")
+                    if not is_valid_ip(ip):
+                        auth_skipped_lines += count
+                        continue
                     for _ in range(count):
                         recent[ip].append(when)
                     cutoff = when - WINDOW
@@ -149,7 +185,8 @@ def main():
         both = attackers & web_hits.keys()
         analyzed = auth_failed_logins - auth_skipped_lines
         for ip in both:
-            print(f"{tag('CORRELATED')} {ip} ({lookup_ip(ip).get('country', '?')}, {lookup_ip(ip).get('city', '?')}): "
+            info = lookup_ip(ip)
+            print(f"{tag('CORRELATED')} {ip} ({info.get('country', '?')}, {info.get('city', '?')}): "
                   f"SSH brute force + web paths {web_hits[ip]}")
         print(f"{tag('SUMMARY')} auth log: {auth_lines_read} lines, {auth_failed_logins} failed logins, "
               f"{brute_force_alerts} alerts")
@@ -157,14 +194,17 @@ def main():
             if web_skipped_lines:
                 print(f"{tag('WARN')} {web_skipped_lines} web log lines skipped: unreadable format")
             if web_matched:
-                print(f"{tag('SUMMARY')} web log: {web_lines_read} lines, {web_matched} matched,"
+                print(f"{tag('SUMMARY')} web log: {web_lines_read} lines, {web_matched} matched, "
                       f"{web_suspicious_hits} suspicious hits")
                 if not both:
                     print(f"{tag('OK')} No correlated activity")
             if not web_matched:
                 print(f"{tag('WARN')} No web log lines matched the expected format. Wrong log or unsupported format?")
         if auth_skipped_lines:
-            print(f"{tag('WARN')} {auth_skipped_lines} failed logins skipped: unreadable timestamp")
+            if auth_skipped_lines == 1:
+                print(f"{tag('WARN')} {auth_skipped_lines} failed login skipped: unreadable format or invalid IP")
+            else:
+                print(f"{tag('WARN')} {auth_skipped_lines} failed logins skipped: unreadable format or invalid IP")
         if brute_force_alerts == 0:
             if auth_failed_logins == 0:
                 print(f"{tag('WARN')} No failed logins recognized. Wrong log, or unsupported format?")

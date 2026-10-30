@@ -127,6 +127,13 @@ Nov 28 08:18:23 time sshd[13352]: Failed password for invalid user 0 from 185.19
 Nov 28 08:18:48 time sshd[13356]: Failed password for invalid user 1234 from 185.190.58.108 port 42473 ssh2
 Nov 28 08:19:12 time sshd[13358]: Failed none for invalid user admin from 185.190.58.108 port 42242 ssh2
 Nov 28 08:19:43 time sshd[13360]: Failed password for invalid user admin from 185.190.58.108 port 41828 ssh2
-
 Nov 28 08:22:11 time sshd[13365]: Failed password for invalid user admin from 185.190.58.108 port 35140 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from 2001:db8::1 port 22 ssh2
+Nov 28 05:11:25 time sshd[1]: Failed password for root from deadbeef port 22 ssh2
+
 

@@ -2,7 +2,6 @@ title: SSH Brute Force Detection
 id: 3ca8b172-e1d5-4cb3-af05-b778737ad941
 status: experimental
 description: Catches 5 or more failed ssh password attempts within 60 seconds
-author: Abdur-Rahman Dalhatu Hamza
 logsource:
     product: linux
     service: sshd
