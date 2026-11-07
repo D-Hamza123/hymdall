@@ -1,6 +1,6 @@
 [project]
 name = "hymdall"
-version = "0.9.0"
+version = "1.0.0"
 description = "A tool for detecting and analyzing malicious activity in network traffic."
 authors = [
     { name = "Abdur-Rahman Dalhatu Hamza", email = "abdurrahmanhamza123@gmail.com"}

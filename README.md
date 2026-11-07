@@ -1,43 +1,46 @@
 # hymdall
 
 ## Overview
-hymdall is a utility designed to analyze and process log files to identify specific patterns, anomalies, or security-related events. It is particularly useful for system administrators, security analysts, and developers who need to monitor and investigate system activities.
+hymdall is a command-line tool that scans server log files for signs of attack. It reads an SSH authentication log (and optionally a web server log), flags brute force login attempts and probes of sensitive web paths, and points out IP addresses that did both. It is aimed at system administrators, security analysts, and developers who want a quick read on what is hitting their servers.
 
 ## How It Works
-hymdall operates by scanning log files for predefined patterns, anomalies, or suspicious activities. The tool uses Sigma rules to define these patterns, making it highly customizable and adaptable to various use cases. Here's a high-level overview of its workflow:
-
-1. **Log File Parsing**: hymdall reads log files from the `sample-logs/` directory, including authentication logs and web logs.
-2. **Pattern Matching**: The tool applies predefined Sigma rules to detect specific threats, such as brute force attacks or unauthorized access attempts.
-3. **Anomaly Detection**: It identifies unusual patterns in log data, such as repeated failed login attempts or access to sensitive web paths.
-4. **Correlation Analysis**: hymdall correlates events across multiple logs to provide a comprehensive view of potential security incidents.
-5. **Reporting**: The results of the analysis are displayed in the terminal, highlighting any detected threats or anomalies.
+1. **Auth log scan**: hymdall reads the auth log you pass with `--auth` and picks out failed SSH password attempts.
+2. **Brute force detection**: if one IP fails to log in **5 or more times within 60 seconds**, hymdall raises an `[SSH]` alert and looks up the IP's country and city.
+3. **Web log scan (optional)**: if you pass a web log with `--web`, hymdall flags requests to known attack targets: `/wp-login.php`, `/admin`, `/.env` and `/phpmyadmin`.
+4. **Correlation**: any IP that triggered an SSH alert *and* probed one of those web paths is reported as `[CORRELATED]`, since it is likely the same attacker working on both services.
+5. **Summary**: hymdall prints line counts and alert totals, plus warnings about lines it could not read.
 
 ## Features
-- **Log Analysis**: Processes log files to extract meaningful information.
-- **Authentication Log Monitoring**: Detects failed login attempts and alerts on repeated suspicious activity.
-- **Web Log Monitoring**: Identifies suspicious access to sensitive paths and tracks HTTP activity.
-- **Sigma Rule Integration**: Includes predefined Sigma rules for detecting specific threats.
-- **Customizable**: Easily extendable to include additional patterns, Sigma rules, or analysis techniques.
+- **SSH brute force detection**: sliding 60-second window per IP, with one alert per burst instead of one per attempt. Collapsed syslog lines ("message repeated N times") are counted as N attempts.
+- **Web probe detection**: reports each suspicious path once per IP.
+- **Cross-log correlation**: links SSH attackers to web scanners by IP.
+- **IP geolocation**: shows the country and city of alerting IPs (see [Privacy and network use](#privacy-and-network-use)).
+- **IPv4 and IPv6 support**: malformed IPs are skipped and counted in the warnings.
+- **Clear diagnostics**: warns when a log looks like the wrong file or an unsupported format, instead of silently reporting "nothing found".
+- **Sigma rule loading (experimental)**: see [Sigma rules](#sigma-rules).
 
 ## File Structure
-- `LICENSE`: Contains the MIT License for the project.
-- `README.md`: Documentation for the project.
-- `pyproject.toml`: Project configuration and packaging metadata (defines the `hymdall` console script entry point).
-- `hymdall.py`: The main script for processing log files.
-- `sample-logs/`: Directory containing sample log files.
-  - `auth logs/`: Contains authentication log samples.
-    - `auth-1.log`
-    - `auth-2.log`
-    - `auth-3.log`
-  - `web logs/`: Contains web log samples.
-    - `web-log1.log`
-- `sigma-rules/`: Directory containing Sigma rules for threat detection.
-  - `correlation.yaml`: Sigma rule for correlating multiple events.
-  - `ssh-brute-force.yaml`: Sigma rule for detecting SSH brute force attacks.
-  - `ssh-brute-force-correlation.yaml`: Sigma rule for correlating SSH brute force attacks.
-  - `web-detection.yaml`: Sigma rule for detecting suspicious web activity.
+- `LICENSE`: MIT License for the project.
+- `README.md`: this documentation.
+- `pyproject.toml`: project configuration and packaging metadata (defines the `hymdall` command).
+- `hymdall.py`: the tool itself.
+- `sample-logs/`: example logs to try the tool on.
+  - `auth-logs/`
+    - `auth-1.log`: a real-world style log with several brute force attackers.
+    - `auth-2.log`: a small log with no brute force.
+    - `auth-3.log`: normal activity mixed with attacks.
+  - `web-logs/`
+    - `web-log1.log`, `web-log2.log`: web logs with scanner traffic.
+    - `web-log3.log`: a log in an **unsupported** format, useful for seeing the format warning.
+- `sigma-rules/`: Sigma rule files describing the detections.
+  - `ssh-brute-force.yaml`: matches failed SSH password attempts.
+  - `ssh-brute-force-correlation.yaml`: the "5 failures in 60 seconds" count rule.
+  - `web-detection.yaml`: matches requests to suspicious web paths.
+  - `correlation.yaml`: links SSH brute force and web reconnaissance from the same IP.
 
 ## Installation
+
+**Requirements:** Python 3.8 or newer. The only dependency is `pyyaml`, which pipx installs for you automatically.
 
 hymdall is not published on PyPI. Install it directly from the repository with pipx, which keeps the tool in an isolated environment and makes the `hymdall` command available on your PATH without touching your system Python.
 
@@ -79,15 +82,20 @@ pipx upgrade hymdall
 
 ### Alternative: Clone and run manually
 
-If you prefer not to install pipx (for example, if you want to edit the source or run the tool from a virtual environment), clone the repository and run the script directly:
+If you prefer not to use pipx (for example, to edit the source), clone the repository, create a virtual environment and install the dependency:
 
 ```bash
 git clone https://github.com/D-Hamza123/hymdall.git
 cd hymdall
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install pyyaml
 python3 hymdall.py --auth /path/to/auth.log --web /path/to/web.log
 ```
 
-With this approach you will need to `git pull` (or re-clone) to receive updates.
+Skipping `pip install pyyaml` makes the script fail at startup with `ModuleNotFoundError: No module named 'yaml'`.
+
+With this approach you will need to `git pull` to receive updates.
 
 ### Which option should I use?
 
@@ -98,58 +106,118 @@ With this approach you will need to `git pull` (or re-clone) to receive updates.
 
 ## Usage
 
-### Prerequisites
-Ensure you have Python installed on your system. This tool is compatible with Python 3.x.
-
-### Running the Tool
-1. Clone the repository to your local machine:
-   ```bash
-   git clone https://github.com/D-Hamza123/hymdall.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd hymdall
-   ```
-3. Run the main script to process authentication and web logs:
-   ```bash
-   python3 hymdall.py
-   ```
-
-The script will automatically process all logs in the `sample-logs/auth logs/` and `sample-logs/web logs/` directories.
-
-### Using Arguments
-hymdall supports command-line arguments to customize its behavior. Below is the general syntax for running the tool with arguments:
-
 ```bash
-python3 hymdall.py [options]
+hymdall --auth <file> [--web <file>] [--rules <file>]
 ```
 
-#### Available Arguments
-- `--auth-logs <path>`: Specify the path to the directory containing authentication logs. Default is `sample-logs/auth logs/`.
-- `--web-logs <path>`: Specify the path to the directory containing web logs. Default is `sample-logs/web logs/`.
+If you cloned the repo instead of using pipx, replace `hymdall` with `python3 hymdall.py`.
 
-#### Example Commands
-1. Analyze logs using default directories:
-   ```bash
-   python3 hymdall.py
-   ```
+### Arguments
 
-2. Specify custom directories for logs and Sigma rules:
-   ```bash
-   python3 hymdall.py --auth-logs /path/to/auth-logs --web-logs /path/to/web-logs
-   ```
+| Argument | Required | Description |
+|---|---|---|
+| `--auth <file>` | Yes | Path to an SSH auth log file (for example `/var/log/auth.log`). |
+| `--web <file>` | No | Path to a web server access log. Enables web probe detection and correlation. |
+| `--rules <file>` | No | Path to a Sigma rule file. Experimental, see [Sigma rules](#sigma-rules). |
+| `-h`, `--help` | No | Show the help message. |
 
-### Example Use Cases
-- **System Monitoring**: Use hymdall to monitor authentication logs for failed login attempts or brute force attacks.
-- **Web Security**: Analyze web server logs to detect unauthorized access to sensitive endpoints.
-- **Incident Investigation**: Correlate events across multiple logs to investigate potential security incidents.
-- **Custom Threat Detection**: Extend the tool with your own Sigma rules to detect specific threats relevant to your environment.
+Each argument takes **one file**, not a directory. To scan several logs, run the tool once per file.
+
+Reading system logs such as `/var/log/auth.log` usually needs `sudo`, or you can copy the file somewhere readable first.
+
+### Examples
+
+Scan an auth log only:
+```bash
+hymdall --auth sample-logs/auth-logs/auth-1.log
+```
+
+Scan an auth log and a web log, with correlation:
+```bash
+hymdall --auth sample-logs/auth-logs/auth-1.log --web sample-logs/web-logs/web-log1.log
+```
+
+### Sample Output
+
+Running the second example above produces output like this (trimmed):
+
+```text
+[SSH] 185.190.58.108 (?, ?) 5 failed attempts within 60s at 2026-11-28 05:13:59
+[SSH] 212.129.2.219 (?, ?) 5 failed attempts within 60s at 2026-11-28 05:48:33
+...
+[WEB] 198.51.100.23 accessed /wp-login.php at 2026-09-29 14:00:00+01:00
+[WEB] 185.220.101.5 accessed /admin at 2026-09-29 14:00:12+01:00
+...
+[CORRELATED] 212.129.2.219 (?, ?): SSH brute force + web paths ['/admin']
+[CORRELATED] 185.190.58.108 (?, ?): SSH brute force + web paths ['/phpmyadmin']
+...
+[SUMMARY] auth log: 139 lines, 129 failed logins, 6 alerts
+[SUMMARY] web log: 55 lines, 55 matched, 17 suspicious hits
+[WARN] 1 failed login skipped: unreadable format or invalid IP
+```
+
+What each label means:
+
+| Label | Meaning |
+|---|---|
+| `[SSH]` | An IP crossed the brute force threshold. Shows its location, the number of attempts in the window, and when. |
+| `[WEB]` | An IP requested a suspicious path (each path is shown once per IP). |
+| `[CORRELATED]` | An IP that appears in both an `[SSH]` and a `[WEB]` alert. |
+| `[SUMMARY]` | Totals for each log. |
+| `[WARN]` | Lines that were skipped, or a log that does not look like the expected format. |
+| `[OK]` | Nothing suspicious found for that check. |
+
+Locations normally appear as `(Country, City)`. They show as `(?, ?)` when the lookup fails, for example when you are offline.
+
+In a terminal, labels are color-coded.
+
+## Supported Log Formats
+
+**Auth log** (`--auth`): standard Linux sshd logs. hymdall looks for lines containing `Failed password ... from <IP>`, and the line must start with a timestamp in one of these forms:
+- Syslog: `Nov 28 05:11:25 host sshd[1234]: Failed password for root from 203.0.113.5 port 22 ssh2` (syslog has no year, so the current year is assumed)
+- ISO 8601: `2026-11-28T05:11:25+00:00 host sshd[1234]: Failed password ...`
+
+Other lines (successful logins, `Failed none`, etc.) are ignored.
+
+**Web log** (`--web`): Apache / Nginx *common* or *combined* log format:
+```text
+198.51.100.23 - - [29/Sep/2026:14:00:00 +0100] "POST /wp-login.php HTTP/1.1" 403 186 "-" "Mozilla/5.0 ..."
+```
+Paths must match exactly: `/admin` is flagged, but `/admin/` or `/wp-login.php?redirect=x` are not.
+
+## Privacy and network use
+
+To show where an attacker is located, hymdall sends each IP that triggers an `[SSH]` or `[CORRELATED]` alert to the free [ip-api.com](https://ip-api.com) service. Keep in mind:
+- The request is made over **plain HTTP** (the free tier does not offer HTTPS), so the IP is visible on the network.
+- Only alerting IPs are sent, each IP at most once per run. IPs that only appear in `[WEB]` alerts are not looked up.
+- The free tier allows about 45 lookups per minute. Lookups beyond that, or with no internet connection, show as `(?, ?)` and the scan continues normally.
+- There is currently no option to turn lookups off. If your logs must not leave the machine, run the tool without network access.
+
+## Sigma rules
+
+The `sigma-rules/` folder describes hymdall's detections in the [Sigma](https://sigmahq.io) format, so they can be reused in other security tools.
+
+**Current limitation:** detection in hymdall is built into the code and does **not** use these rule files yet. The `--rules` option only loads and validates a rule file. It does not change what gets detected.
+
+`--rules` accepts only simple rules: a single `detection.selection` block, with field modifiers limited to none (exact match) or `contains`. `ssh-brute-force.yaml` and `web-detection.yaml` load fine. The correlation rules (`correlation.yaml`, `ssh-brute-force-correlation.yaml`) are not supported and make the tool exit with an "Invalid Sigma rule structure" error.
+
+## Example Use Cases
+- **System Monitoring**: check auth logs for brute force attacks.
+- **Web Security**: find scanners probing for admin panels, WordPress logins or leaked `.env` files.
+- **Incident Investigation**: identify IPs attacking both SSH and the web server.
 
 ## Extending the Tool
-To add new patterns, Sigma rules, or analysis techniques:
-1. Open `hymdall.py` in a text editor.
-2. Locate the section where patterns or Sigma rules are defined or analysis logic is implemented.
-3. Add your custom logic or rules.
+The settings you are most likely to change are in `hymdall.py`:
+
+| What | Where | Default |
+|---|---|---|
+| Brute force window | `WINDOW`, top of the file | 60 seconds |
+| Brute force threshold | `THRESHOLD`, top of the file | 5 attempts |
+| Suspicious web paths | `suspicious_paths`, inside `main()` | `/wp-login.php`, `/admin`, `/.env`, `/phpmyadmin` |
+| Auth line pattern | `ssh_pattern`, inside `main()` | `Failed password ... from <IP>` |
+| Web line pattern | `web_pattern`, inside `main()` | Apache/Nginx common log format |
+
+New timestamp formats can be added to `parse_timestamp()`.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests on the project's repository.
